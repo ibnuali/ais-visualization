@@ -18,10 +18,7 @@ import {
   toWorkerControlResponses,
 } from "./serializers.ts";
 
-const DEFAULT_CORS_ORIGINS = new Set([
-  "http://localhost:5299",
-  "http://127.0.0.1:5299",
-]);
+const EMPTY_CORS_ORIGINS = new Set<string>();
 const MIN_MMSI = 100_000_000;
 const MAX_MMSI = 999_999_999;
 
@@ -336,7 +333,7 @@ export function createApiApp({
   vesselQueries = unavailableVesselQueries,
   workerControls = unavailableWorkerControls,
   workerControlToken,
-  corsOrigins = DEFAULT_CORS_ORIGINS,
+  corsOrigins = EMPTY_CORS_ORIGINS,
 }: ApiAppOptions = {}): Hono {
   const app = new Hono();
 

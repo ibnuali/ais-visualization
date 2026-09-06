@@ -374,6 +374,7 @@ describe("HTTP API adapter", () => {
       authentication: testAuthentication,
       vesselQueries: emptyVesselQueries,
       workerControls: emptyWorkerControls,
+      corsOrigins: new Set(["http://localhost:5299"]),
     });
 
     const preflightResponse = await app.request(

@@ -8,8 +8,6 @@ import {
 } from "../domain/worker-regions.ts";
 import type { WorkerId } from "../domain/models.ts";
 
-const DEFAULT_CORS_ORIGINS = ["http://localhost:5299", "http://127.0.0.1:5299"];
-
 export interface RuntimeConfig {
   betterAuthSecret?: string;
   betterAuthUrl: string;
@@ -50,13 +48,12 @@ export function loadRuntimeConfig(
   const betterAuthUrl =
     environment.BETTER_AUTH_URL?.trim() || `http://localhost:${configuredPort}`;
   const configuredOrigins = environment.CORS_ORIGINS ?? "";
-  const corsOrigins = new Set([
-    ...DEFAULT_CORS_ORIGINS,
-    ...configuredOrigins
+  const corsOrigins = new Set(
+    configuredOrigins
       .split(",")
       .map((origin) => origin.trim())
       .filter(Boolean),
-  ]);
+  );
 
   return {
     betterAuthSecret: environment.BETTER_AUTH_SECRET?.trim(),
