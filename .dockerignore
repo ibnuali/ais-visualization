@@ -1,0 +1,17 @@
+.git
+node_modules
+**/node_modules
+dist
+**/dist
+.turbo
+**/.turbo
+.env
+.env.*
+**/.env
+**/.env.*
+coverage
+**/coverage
+out
+.commandcode
+.wayfinder
+.pi

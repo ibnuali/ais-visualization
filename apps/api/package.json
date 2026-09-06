@@ -1,0 +1,19 @@
+{
+  "name": "@ais-anomaly/api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch index.ts",
+    "worker": "bun --watch worker.ts",
+    "start": "bun index.ts",
+    "check": "tsc -p ../../tsconfig.json --noEmit",
+    "test": "bun run check && bun test src/server.test.ts"
+  },
+  "dependencies": {
+    "dotenv": "^17.3.1",
+    "hono": "^4.13.5",
+    "pg": "^8.21.0",
+    "ws": "^8.20.0"
+  }
+}

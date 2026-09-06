@@ -1,0 +1,30 @@
+{
+  "name": "ais-anomaly",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "AIS vessel tracking console",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev worker --parallel",
+    "start": "turbo run start worker --filter=@ais-anomaly/api --parallel",
+    "build": "turbo run build",
+    "preview": "turbo run preview --filter=@ais-anomaly/web",
+    "test": "turbo run test build",
+    "check": "turbo run check"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@types/ws": "^8.18.1",
+    "bun-types": "^1.4.2",
+    "turbo": "^2.10.11",
+    "typescript": "^7.0.2"
+  },
+  "packageManager": "bun@1.3.14"
+}

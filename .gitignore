@@ -1,0 +1,10 @@
+node_modules/
+.wayfinder
+out
+.commandcode
+.pi
+dist/
+.turbo/
+.env
+.env.*
+!.env.example
