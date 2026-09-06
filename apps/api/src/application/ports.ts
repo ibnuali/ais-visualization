@@ -4,6 +4,7 @@ import type {
   TrackFeature,
   VesselSnapshot,
   WorkerControl,
+  WorkerId,
   WorkerState,
 } from "../domain/models.ts";
 
@@ -15,9 +16,17 @@ export interface VesselSnapshotReader {
 }
 
 export interface WorkerControlStore {
-  getWorkerControl(): Promise<WorkerControl>;
-  setWorkerEnabled(isEnabled: boolean): Promise<WorkerControl>;
-  setWorkerState(workerState: WorkerState): Promise<WorkerControl>;
+  getWorkerControls(): Promise<WorkerControl[]>;
+  getWorkerControl(workerId: WorkerId): Promise<WorkerControl>;
+  setWorkerEnabled(
+    workerId: WorkerId,
+    isEnabled: boolean,
+  ): Promise<WorkerControl>;
+  setAllWorkerEnabled(isEnabled: boolean): Promise<void>;
+  setWorkerState(
+    workerId: WorkerId,
+    workerState: WorkerState,
+  ): Promise<WorkerControl>;
 }
 
 export interface VesselDataWriter {

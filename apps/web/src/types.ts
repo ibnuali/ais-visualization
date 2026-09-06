@@ -31,6 +31,9 @@ export type Coordinate = [number, number];
 export interface TrackProperties {
   timestamps: Array<string | null>;
   headings: Array<number | null>;
+  sogs: Array<number | null>;
+  cogs: Array<number | null>;
+  nav_statuses: Array<string | null>;
 }
 
 export interface TrackFeature {
@@ -46,6 +49,9 @@ export interface PlaybackPosition {
   longitude: number;
   latitude: number;
   heading: number;
+  sog: number | null;
+  cog: number | null;
+  navStatus: string | null;
   timestamp: string | null;
 }
 
@@ -113,10 +119,17 @@ export interface MapControls {
 }
 
 export interface WorkerControl {
+  worker_id: string;
+  region: string;
+  region_description: string;
   is_enabled: boolean;
   worker_state: "running" | "stopped";
   updated_at: string | null;
   last_heartbeat: string | null;
+}
+
+export interface WorkerControlsResponse {
+  workers: WorkerControl[];
   control_configured: boolean;
 }
 

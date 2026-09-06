@@ -5,12 +5,17 @@
   "type": "module",
   "scripts": {
     "dev": "bun --watch index.ts",
-    "worker": "bun --watch worker.ts",
+    "worker": "WORKER_ID=west bun --watch worker.ts",
+    "worker:west": "WORKER_ID=west bun --watch worker.ts",
+    "worker:central": "WORKER_ID=central bun --watch worker.ts",
+    "worker:east": "WORKER_ID=east bun --watch worker.ts",
     "start": "bun index.ts",
+    "auth:create-user": "bun src/scripts/create-auth-user.ts",
     "check": "tsc -p ../../tsconfig.json --noEmit",
     "test": "bun run check && bun test src/server.test.ts"
   },
   "dependencies": {
+    "better-auth": "^1.7.3",
     "dotenv": "^17.3.1",
     "hono": "^4.13.5",
     "pg": "^8.21.0",

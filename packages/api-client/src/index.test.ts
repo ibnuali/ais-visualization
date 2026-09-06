@@ -31,6 +31,7 @@ test("sends request options and returns JSON payloads", async () => {
   expect(requests).toEqual([
     {
       options: {
+        credentials: "include",
         headers: { "X-Worker-Control-Token": "token" },
         method: "POST",
       },
@@ -39,7 +40,7 @@ test("sends request options and returns JSON payloads", async () => {
   ]);
 });
 
-test("uses API error payloads when requests fail", async () => {
+test("uses API error payloads when requests fail", () => {
   const client = createApiClient({
     origin: "https://api.example.test",
     fetchImpl: async () =>
@@ -51,7 +52,7 @@ test("uses API error payloads when requests fail", async () => {
       ),
   });
 
-  await expect(client.requestJson("/api/worker/start")).rejects.toThrow(
+  return expect(client.requestJson("/api/worker/start")).rejects.toThrow(
     "Worker control is unauthorized",
   );
 });

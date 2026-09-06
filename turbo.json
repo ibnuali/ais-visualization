@@ -19,6 +19,18 @@
       "cache": false,
       "persistent": true
     },
+    "worker:west": {
+      "cache": false,
+      "persistent": true
+    },
+    "worker:central": {
+      "cache": false,
+      "persistent": true
+    },
+    "worker:east": {
+      "cache": false,
+      "persistent": true
+    },
     "start": {
       "cache": false,
       "persistent": true

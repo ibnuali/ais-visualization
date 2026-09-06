@@ -41,7 +41,7 @@ services:
     ports:
       - "3000:3000"
 
-  worker:
+  worker-west:
     build:
       context: .
       target: api
@@ -51,6 +51,37 @@ services:
       - ./apps/api/.env
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ais_anomaly
+      WORKER_ID: west
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker-central:
+    build:
+      context: .
+      target: api
+    restart: unless-stopped
+    command: ["bun", "apps/api/worker.ts"]
+    env_file:
+      - ./apps/api/.env
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ais_anomaly
+      WORKER_ID: central
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker-east:
+    build:
+      context: .
+      target: api
+    restart: unless-stopped
+    command: ["bun", "apps/api/worker.ts"]
+    env_file:
+      - ./apps/api/.env
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ais_anomaly
+      WORKER_ID: east
     depends_on:
       postgres:
         condition: service_healthy

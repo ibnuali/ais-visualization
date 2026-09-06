@@ -9,8 +9,9 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "turbo run dev worker --parallel",
-    "start": "turbo run start worker --filter=@ais-anomaly/api --parallel",
+    "dev": "turbo run dev worker:west worker:central worker:east --parallel",
+    "start": "turbo run start worker:west worker:central worker:east --filter=@ais-anomaly/api --parallel",
+    "auth:create-user": "bun run --filter @ais-anomaly/api auth:create-user",
     "build": "turbo run build",
     "preview": "turbo run preview --filter=@ais-anomaly/web",
     "test": "turbo run test build",

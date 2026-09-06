@@ -8,8 +8,8 @@ export default function WorkerIntro() {
       <div className="intro__aside">
         <span className="intro__rule" aria-hidden="true" />
         <p>
-          Control the background AIS subscription without interrupting map
-          access to positions already stored in PostgreSQL.
+          Monitor and control the three regional AIS subscriptions without
+          interrupting map access to positions already stored in PostgreSQL.
         </p>
       </div>
     </section>

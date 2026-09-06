@@ -4,9 +4,11 @@ import type {
   VesselDataWriter,
   WorkerControlStore,
 } from "./ports.ts";
+import { DEFAULT_WORKER_ID, type WorkerId } from "../domain/worker-regions.ts";
 
 export interface IngestionWorkerOptions {
   apiKey?: string;
+  workerId?: WorkerId;
   createIngestion?: CreateIngestion;
   workerControlStore?: WorkerControlStore;
   vesselDataWriter?: VesselDataWriter;
@@ -27,6 +29,7 @@ function getErrorMessage(error: unknown): string {
 
 export function createIngestionWorker({
   apiKey,
+  workerId = DEFAULT_WORKER_ID,
   createIngestion,
   workerControlStore,
   vesselDataWriter,
@@ -57,7 +60,7 @@ export function createIngestionWorker({
 
     isReconciling = true;
     try {
-      const control = await workerControlStore.getWorkerControl();
+      const control = await workerControlStore.getWorkerControl(workerId);
       const shouldRun = control.isEnabled;
 
       if (shouldRun && !ingestion) {
@@ -75,6 +78,7 @@ export function createIngestionWorker({
       }
 
       await workerControlStore.setWorkerState(
+        workerId,
         ingestion ? "running" : "stopped",
       );
     } finally {
@@ -112,7 +116,7 @@ export function createIngestionWorker({
       ingestion = null;
     }
 
-    await workerControlStore.setWorkerState("stopped");
+    await workerControlStore.setWorkerState(workerId, "stopped");
   };
 
   return {

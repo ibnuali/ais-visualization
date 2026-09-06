@@ -1,18 +1,21 @@
-import type { WorkerControl } from "../domain/models.ts";
+import type { WorkerControl, WorkerId } from "../domain/models.ts";
 import type { WorkerControlStore } from "./ports.ts";
 
 export interface WorkerControls {
-  getStatus(): Promise<WorkerControl>;
-  enable(): Promise<WorkerControl>;
-  disable(): Promise<WorkerControl>;
+  getStatuses(): Promise<WorkerControl[]>;
+  enable(workerId: WorkerId): Promise<WorkerControl>;
+  disable(workerId: WorkerId): Promise<WorkerControl>;
+  setAllEnabled(isEnabled: boolean): Promise<void>;
 }
 
 export function createWorkerControls(
   workerControlStore: WorkerControlStore,
 ): WorkerControls {
   return {
-    getStatus: () => workerControlStore.getWorkerControl(),
-    enable: () => workerControlStore.setWorkerEnabled(true),
-    disable: () => workerControlStore.setWorkerEnabled(false),
+    getStatuses: () => workerControlStore.getWorkerControls(),
+    enable: (workerId) => workerControlStore.setWorkerEnabled(workerId, true),
+    disable: (workerId) => workerControlStore.setWorkerEnabled(workerId, false),
+    setAllEnabled: (isEnabled) =>
+      workerControlStore.setAllWorkerEnabled(isEnabled),
   };
 }

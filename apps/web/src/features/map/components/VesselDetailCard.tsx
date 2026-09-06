@@ -34,6 +34,18 @@ export default function VesselDetailCard({
     return null;
   }
 
+  const displayedVessel: VesselRecord = playbackPosition
+    ? {
+        ...selected,
+        latitude: playbackPosition.latitude,
+        longitude: playbackPosition.longitude,
+        sog: playbackPosition.sog,
+        cog: playbackPosition.cog,
+        heading: playbackPosition.heading,
+        nav_status: playbackPosition.navStatus,
+        timestamp: playbackPosition.timestamp,
+      }
+    : selected;
   const hasTrackPlayback =
     trackState.status === "ready" && trackState.points > 1;
   let playbackLabel = "Play";
@@ -85,25 +97,25 @@ export default function VesselDetailCard({
         <div>
           <dt>Position</dt>
           <dd>
-            {formatNumber(selected.latitude, 3)},{" "}
-            {formatNumber(selected.longitude, 3)}
+            {formatNumber(displayedVessel.latitude, 3)},{" "}
+            {formatNumber(displayedVessel.longitude, 3)}
           </dd>
         </div>
         <div>
           <dt>SOG</dt>
-          <dd>{formatNumber(selected.sog)} kn</dd>
+          <dd>{formatNumber(displayedVessel.sog)} kn</dd>
         </div>
         <div>
           <dt>COG</dt>
-          <dd>{formatNumber(selected.cog, 0)}°</dd>
+          <dd>{formatNumber(displayedVessel.cog, 0)}°</dd>
         </div>
         <div>
           <dt>Heading</dt>
-          <dd>{formatNumber(selected.heading, 0)}°</dd>
+          <dd>{formatNumber(displayedVessel.heading, 0)}°</dd>
         </div>
         <div>
           <dt>Status</dt>
-          <dd>{selected.nav_status || "—"}</dd>
+          <dd>{displayedVessel.nav_status || "—"}</dd>
         </div>
       </dl>
       {hasTrackPlayback && (

@@ -1,3 +1,4 @@
+import { createAuthentication } from "../application/authentication.ts";
 import { createVesselQueries } from "../application/vessel-queries.ts";
 import { createWorkerControls } from "../application/worker-controls.ts";
 import { startBunServer } from "../infrastructure/http/bun-server.ts";
@@ -12,13 +13,27 @@ export interface ApiRuntime {
 export async function startApiRuntime(
   config: RuntimeConfig,
 ): Promise<ApiRuntime> {
+  if (!config.betterAuthSecret) {
+    throw new Error("BETTER_AUTH_SECRET is required to start the API");
+  }
+
+  const authentication = createAuthentication({
+    baseURL: config.betterAuthUrl,
+    corsOrigins: config.corsOrigins,
+    databaseUrl: config.databaseUrl,
+    secret: config.betterAuthSecret,
+    tokenTtlSeconds: config.authSessionTtlSeconds,
+  });
   const repository = createPostgresAisRepository({
     connectionString: config.databaseUrl,
   });
 
-  await repository.initialize();
   try {
+    await repository.initialize();
+    await authentication.initialize();
+
     const app = createApiApp({
+      authentication,
       vesselQueries: createVesselQueries(repository),
       workerControls: createWorkerControls(repository),
       workerControlToken: config.workerControlToken,
@@ -32,11 +47,19 @@ export async function startApiRuntime(
     return {
       stop: async (): Promise<void> => {
         await server.stop();
-        await repository.close();
+        try {
+          await authentication.close();
+        } finally {
+          await repository.close();
+        }
       },
     };
   } catch (error) {
-    await repository.close();
+    try {
+      await authentication.close();
+    } finally {
+      await repository.close();
+    }
     throw error;
   }
 }

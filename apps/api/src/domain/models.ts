@@ -1,3 +1,10 @@
+export const WORKER_IDS = ["west", "central", "east"] as const;
+export type WorkerId = (typeof WORKER_IDS)[number];
+export type BoundingBox = readonly [
+  readonly [number, number],
+  readonly [number, number],
+];
+
 export type VesselClass = "A" | "B";
 export type WorkerState = "running" | "stopped";
 
@@ -46,6 +53,7 @@ export interface VesselSnapshot {
 }
 
 export interface WorkerControl {
+  workerId: WorkerId;
   isEnabled: boolean;
   workerState: WorkerState;
   updatedAt: string;
@@ -61,5 +69,8 @@ export interface TrackFeature {
   properties: {
     timestamps: string[];
     headings: Array<number | null>;
+    sogs: Array<number | null>;
+    cogs: Array<number | null>;
+    nav_statuses: Array<string | null>;
   };
 }

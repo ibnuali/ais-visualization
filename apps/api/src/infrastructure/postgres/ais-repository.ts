@@ -5,14 +5,17 @@ import type {
   VesselSnapshotReader,
   WorkerControlStore,
 } from "../../application/ports.ts";
-import type {
-  PositionReport,
-  ShipStaticData,
-  TrackFeature,
-  VesselSnapshot,
-  WorkerControl,
-  WorkerState,
+import {
+  WORKER_IDS,
+  type PositionReport,
+  type ShipStaticData,
+  type TrackFeature,
+  type VesselSnapshot,
+  type WorkerControl,
+  type WorkerId,
+  type WorkerState,
 } from "../../domain/models.ts";
+import { WORKER_REGIONS } from "../../domain/worker-regions.ts";
 
 export interface DatabaseLifecycle {
   initialize(): Promise<void>;
@@ -49,6 +52,7 @@ interface VesselSnapshotRow extends QueryResultRow {
 }
 
 interface WorkerControlRow extends QueryResultRow {
+  worker_id: WorkerId;
   is_enabled: boolean;
   worker_state: WorkerState;
   updated_at: DatabaseTimestamp;
@@ -59,7 +63,10 @@ interface TrackRow extends QueryResultRow {
   timestamp: DatabaseTimestamp;
   latitude: number;
   longitude: number;
+  sog: number | null;
+  cog: number | null;
   heading: number | null;
+  nav_status: string | null;
 }
 
 function asRequiredIsoTimestamp(value: DatabaseTimestamp): string {
@@ -102,6 +109,7 @@ function toVesselSnapshot(row: VesselSnapshotRow): VesselSnapshot {
 
 function toWorkerControl(row: WorkerControlRow): WorkerControl {
   return {
+    workerId: row.worker_id,
     isEnabled: row.is_enabled,
     workerState: row.worker_state,
     updatedAt: asRequiredIsoTimestamp(row.updated_at),
@@ -187,20 +195,89 @@ export function createPostgresAisRepository({
         );
       `);
 
+      const workerControlColumns = await client.query<{ column_name: string }>(
+        `
+          SELECT column_name
+          FROM information_schema.columns
+          WHERE table_schema = 'ais'
+            AND table_name = 'ingestion_worker_control'
+        `,
+      );
+      const hasWorkerControlTable = workerControlColumns.rows.length > 0;
+      const hasWorkerIdColumn = workerControlColumns.rows.some(
+        (row) => row.column_name === "worker_id",
+      );
+
+      if (hasWorkerControlTable && !hasWorkerIdColumn) {
+        await client.query(`
+          ALTER TABLE ais.ingestion_worker_control
+            ADD COLUMN worker_id TEXT
+        `);
+        await client.query(`
+          UPDATE ais.ingestion_worker_control
+             SET worker_id = CASE id
+               WHEN 1 THEN 'west'
+               WHEN 2 THEN 'central'
+               WHEN 3 THEN 'east'
+             END
+           WHERE worker_id IS NULL
+        `);
+        await client.query(`
+          ALTER TABLE ais.ingestion_worker_control
+            ALTER COLUMN worker_id SET NOT NULL
+        `);
+      }
+
       await client.query(`
         CREATE TABLE IF NOT EXISTS ais.ingestion_worker_control (
-          id             SMALLINT PRIMARY KEY CHECK (id = 1),
+          id             SMALLINT PRIMARY KEY,
+          worker_id      TEXT NOT NULL UNIQUE,
           is_enabled     BOOLEAN NOT NULL DEFAULT TRUE,
           worker_state   TEXT NOT NULL DEFAULT 'stopped'
                          CHECK (worker_state IN ('running', 'stopped')),
           updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
           last_heartbeat TIMESTAMPTZ
         );
-
-        INSERT INTO ais.ingestion_worker_control (id, is_enabled)
-        VALUES (1, TRUE)
-        ON CONFLICT (id) DO NOTHING;
       `);
+      await client.query(`
+        ALTER TABLE ais.ingestion_worker_control
+          DROP CONSTRAINT IF EXISTS ingestion_worker_control_id_check
+      `);
+      await client.query(`
+        ALTER TABLE ais.ingestion_worker_control
+          DROP CONSTRAINT IF EXISTS ingestion_worker_control_worker_id_check
+      `);
+      await client.query(`
+        ALTER TABLE ais.ingestion_worker_control
+          ADD CONSTRAINT ingestion_worker_control_worker_id_check
+          CHECK (worker_id IN ('west', 'central', 'east'))
+      `);
+      await client.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS ingestion_worker_control_worker_id_key
+          ON ais.ingestion_worker_control (worker_id)
+      `);
+
+      const defaultWorkerEnabledResult = await client.query<{
+        is_enabled: boolean;
+      }>(`
+        SELECT is_enabled
+        FROM ais.ingestion_worker_control
+        WHERE worker_id = 'west'
+        LIMIT 1
+      `);
+      const defaultWorkerEnabled =
+        defaultWorkerEnabledResult.rows[0]?.is_enabled ?? true;
+
+      for (const [index, region] of WORKER_REGIONS.entries()) {
+        await client.query(
+          `
+            INSERT INTO ais.ingestion_worker_control (id, worker_id, is_enabled)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (worker_id) DO NOTHING
+          `,
+          [index + 1, region.id, defaultWorkerEnabled],
+        );
+      }
 
       await client.query(`
         CREATE OR REPLACE VIEW ais.latest_vessel_position AS
@@ -264,19 +341,35 @@ export function createPostgresAisRepository({
     return result.rows.map(toVesselSnapshot);
   };
 
-  const getWorkerControl = async (): Promise<WorkerControl> => {
+  const getWorkerControls = async (): Promise<WorkerControl[]> => {
     const result = await pool.query<WorkerControlRow>(`
-      SELECT is_enabled, worker_state, updated_at, last_heartbeat
+      SELECT worker_id, is_enabled, worker_state, updated_at, last_heartbeat
       FROM ais.ingestion_worker_control
-      WHERE id = 1
+      ORDER BY id
     `);
 
+    return result.rows.map(toWorkerControl);
+  };
+
+  const getWorkerControl = async (
+    workerId: WorkerId,
+  ): Promise<WorkerControl> => {
+    const result = await pool.query<WorkerControlRow>(
+      `
+        SELECT worker_id, is_enabled, worker_state, updated_at, last_heartbeat
+        FROM ais.ingestion_worker_control
+        WHERE worker_id = $1
+      `,
+      [workerId],
+    );
+
     return toWorkerControl(
-      requireRow(result.rows[0], "AIS worker control state is not initialized"),
+      requireRow(result.rows[0], `AIS worker ${workerId} is not initialized`),
     );
   };
 
   const setWorkerEnabled = async (
+    workerId: WorkerId,
     isEnabled: boolean,
   ): Promise<WorkerControl> => {
     const result = await pool.query<WorkerControlRow>(
@@ -284,18 +377,53 @@ export function createPostgresAisRepository({
         UPDATE ais.ingestion_worker_control
         SET is_enabled = $1,
             updated_at = NOW()
-        WHERE id = 1
-        RETURNING is_enabled, worker_state, updated_at, last_heartbeat
+        WHERE worker_id = $2
+        RETURNING worker_id, is_enabled, worker_state, updated_at, last_heartbeat
       `,
-      [isEnabled],
+      [isEnabled, workerId],
     );
 
     return toWorkerControl(
-      requireRow(result.rows[0], "AIS worker control state is not initialized"),
+      requireRow(result.rows[0], `AIS worker ${workerId} is not initialized`),
     );
   };
 
+  const setAllWorkerEnabled = async (isEnabled: boolean): Promise<void> => {
+    const client = await pool.connect();
+    let isTransactionOpen = false;
+
+    try {
+      await client.query("BEGIN");
+      isTransactionOpen = true;
+
+      const result = await client.query(
+        `
+          UPDATE ais.ingestion_worker_control
+          SET is_enabled = $1,
+              updated_at = NOW()
+          WHERE worker_id = ANY($2::text[])
+        `,
+        [isEnabled, [...WORKER_IDS]],
+      );
+
+      if (result.rowCount !== WORKER_IDS.length) {
+        throw new Error("All AIS workers must be initialized before control");
+      }
+
+      await client.query("COMMIT");
+      isTransactionOpen = false;
+    } catch (error) {
+      if (isTransactionOpen) {
+        await client.query("ROLLBACK");
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
+  };
+
   const setWorkerState = async (
+    workerId: WorkerId,
     workerState: WorkerState,
   ): Promise<WorkerControl> => {
     const result = await pool.query<WorkerControlRow>(
@@ -303,14 +431,14 @@ export function createPostgresAisRepository({
         UPDATE ais.ingestion_worker_control
         SET worker_state = $1,
             last_heartbeat = NOW()
-        WHERE id = 1
-        RETURNING is_enabled, worker_state, updated_at, last_heartbeat
+        WHERE worker_id = $2
+        RETURNING worker_id, is_enabled, worker_state, updated_at, last_heartbeat
       `,
-      [workerState],
+      [workerState, workerId],
     );
 
     return toWorkerControl(
-      requireRow(result.rows[0], "AIS worker control state is not initialized"),
+      requireRow(result.rows[0], `AIS worker ${workerId} is not initialized`),
     );
   };
 
@@ -320,7 +448,7 @@ export function createPostgresAisRepository({
   ): Promise<TrackFeature> => {
     const result = await pool.query<TrackRow>(
       `
-        SELECT timestamp, latitude, longitude, heading
+        SELECT timestamp, latitude, longitude, sog, cog, heading, nav_status
         FROM ais.vessel_positions
         WHERE mmsi = $1
           AND timestamp >= NOW() - ($2::integer * INTERVAL '1 hour')
@@ -343,6 +471,9 @@ export function createPostgresAisRepository({
           asRequiredIsoTimestamp(row.timestamp),
         ),
         headings: result.rows.map((row) => row.heading),
+        sogs: result.rows.map((row) => row.sog),
+        cogs: result.rows.map((row) => row.cog),
+        nav_statuses: result.rows.map((row) => row.nav_status),
       },
     };
   };
@@ -430,8 +561,10 @@ export function createPostgresAisRepository({
     close: () => pool.end(),
     getLatestVesselPositions,
     getVesselTrack,
+    getWorkerControls,
     getWorkerControl,
     setWorkerEnabled,
+    setAllWorkerEnabled,
     setWorkerState,
     storePosition,
     storeShipStaticData,

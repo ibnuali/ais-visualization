@@ -1,3 +1,13 @@
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 export type FetchImplementation = (
   input: RequestInfo | URL,
   init?: RequestInit,
@@ -59,7 +69,10 @@ export function createApiClient({
       ...requestOptions
     }: ApiRequestOptions = {},
   ): Promise<T> {
-    const response = await fetchImpl(getApiUrl(pathname), requestOptions);
+    const response = await fetchImpl(getApiUrl(pathname), {
+      credentials: "include",
+      ...requestOptions,
+    });
     let payload: unknown;
 
     try {
@@ -71,9 +84,10 @@ export function createApiClient({
     }
 
     if (!response.ok) {
-      throw new Error(
+      throw new ApiError(
         (hasApiError(payload) && payload.error) ||
           `${errorPrefix} HTTP ${response.status}.`,
+        response.status,
       );
     }
 

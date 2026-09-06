@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
+import AuthGate from "./features/auth/AuthGate.tsx";
 import WorkerPage from "./WorkerPage.tsx";
 import MapPrototype from "./prototype/MapPrototype.tsx";
 import "./styles.css";
@@ -23,6 +24,8 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <Page />
+    <AuthGate>
+      <Page />
+    </AuthGate>
   </StrictMode>,
 );

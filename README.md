@@ -1,10 +1,10 @@
 # AIS anomaly
 
-A map-first AIS tracking console. A dedicated Bun ingestion worker subscribes to aisstream.io and stores vessel positions in PostgreSQL/PostGIS. The Bun API serves database snapshots and historical tracks to the React map.
+A map-first AIS tracking console. Three dedicated Bun ingestion workers subscribe to non-overlapping AIS regions and store vessel positions in PostgreSQL/PostGIS. The Bun API serves database snapshots and historical tracks to the React map.
 
 ## Monorepo layout
 
-- `apps/api/` — Bun API server, independent AIS ingestion-worker entry point, PostgreSQL access, and API tests.
+- `apps/api/` — Bun API server, independent regional AIS ingestion-worker entry point, PostgreSQL access, and API tests.
 - `apps/web/` — Vite/React map console and its UI-only dependencies.
 - `packages/api-client/` — browser-neutral API client shared by web features and future workspaces.
 - `turbo.json` — Turborepo task graph for the workspace.
@@ -20,19 +20,32 @@ A map-first AIS tracking console. A dedicated Bun ingestion worker subscribes to
    ```
 
    The web UI is available at `http://localhost:5299` and the API at
-   `http://localhost:3000`. Docker Compose loads API and worker configuration
-   from `apps/api/.env`; a root `.env` file is not required. To run only the
-   database for local development, use `docker compose up -d postgres`.
+   `http://localhost:3000`. The web container reverse-proxies browser `/api`
+   requests to the API so Better Auth cookies remain same-origin. Docker
+   Compose loads API and worker configuration from `apps/api/.env`; a root
+   `.env` file is not required. To run only the database for local development,
+   use `docker compose up -d postgres`.
 
 2. Create the API environment file:
 
    ```bash
    cp apps/api/.env.example apps/api/.env
-   # Set API_KEY and a long random WORKER_CONTROL_TOKEN.
+   # Set API_KEY, a 32+-character BETTER_AUTH_SECRET, and a long
+   # random WORKER_CONTROL_TOKEN.
    ```
 
    Both `bun run dev` and Docker Compose use this file. You may remove the
    workspace-root `.env` after moving its values here.
+
+   Create users privately with the API workspace script (the public sign-up
+   endpoint remains disabled):
+
+   ```bash
+   AUTH_NEW_USERNAME=operator \
+   AUTH_NEW_EMAIL=operator@example.com \
+   AUTH_NEW_PASSWORD='use-a-strong-password' \
+   bun run auth:create-user
+   ```
 
 3. Install workspace dependencies:
 
@@ -46,17 +59,20 @@ A map-first AIS tracking console. A dedicated Bun ingestion worker subscribes to
    bun run dev
    ```
 
-Open `http://localhost:5299`. The map automatically refreshes the API's database snapshot every five seconds; it never opens an AIS or API WebSocket. Visit `http://localhost:5299/worker` to start or stop upstream ingestion. The worker process remains available to receive control commands; stopping disables its AIS subscription and database writes. Neither `API_KEY` nor `WORKER_CONTROL_TOKEN` is sent to or persisted in the browser. The control token is entered in the control page only for a request.
+Open `http://localhost:5299` and sign in with a user created by your private Better Auth provisioning script. Better Auth manages the session with an HttpOnly cookie; the browser does not persist the operator password or an access token. The API runs with public sign-up disabled and does not contain user credentials. The map automatically refreshes the API's database snapshot every five seconds; it never opens an AIS or API WebSocket. Visit `http://localhost:5299/worker` to inspect and control the west, central, and east ingestion workers independently. Each worker has its own AIS subscription and heartbeat; stopping one region does not stop the others. Neither `API_KEY` nor `WORKER_CONTROL_TOKEN` is sent to or persisted in the browser. The control token is entered in the control page only for a request.
 
-The API provides:
+The API provides (all `/api/*` routes except the Better Auth handler require a valid Better Auth session cookie or bearer token):
 
-- `GET /health` — service health check
+- `GET /health` — public service health check
+- `POST /api/auth/sign-in/username` — Better Auth username/password sign-in
+- `GET /api/auth/get-session` and `POST /api/auth/sign-out` — Better Auth session endpoints
 - `GET /api/vessels` — latest vessel positions and metadata stored in PostgreSQL
-- `GET /api/worker` — persisted worker state and latest worker heartbeat
-- `POST /api/worker/start` and `POST /api/worker/stop` — enable or disable ingestion; require `X-Worker-Control-Token`
+- `GET /api/workers` — persisted state and latest heartbeat for all three regional workers
+- `POST /api/workers/:workerId/start` and `POST /api/workers/:workerId/stop` — enable or disable one region; require `X-Worker-Control-Token`
+- `GET /api/worker` and `POST /api/worker/start|stop` — aggregate status/control routes for all workers
 - `GET /api/tracks/:mmsi?hours=24` — compact GeoJSON `LineString` historical track, with timestamp and heading arrays for playback
 
-Set `VITE_API_ORIGIN` at web build time only when the browser cannot reach the API at the same hostname on port `3000`.
+Better Auth creates or updates its PostgreSQL tables during API startup, so no separate auth migration command is required for this service. User accounts must be created separately with a private Better Auth provisioning script because public sign-up is disabled. The three regional subscriptions are configured as `west` (95°E–110°E), `central` (110°E–126°E), and `east` (126°E–141°E), covering the original Indonesia latitude range. Vite and nginx proxy `/api` to the API by default; set `VITE_API_ORIGIN` at web build time only when the browser must call a separately hosted API, and add that web origin to `CORS_ORIGINS`.
 
 The map uses OpenStreetMap raster tiles and displays attribution in the map controls.
 

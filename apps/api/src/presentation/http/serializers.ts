@@ -3,6 +3,7 @@ import type {
   VesselSnapshot,
   WorkerControl,
 } from "../../domain/models.ts";
+import { getWorkerRegion } from "../../domain/worker-regions.ts";
 
 export interface VesselSnapshotResponse {
   mmsi: number;
@@ -23,10 +24,22 @@ export interface VesselSnapshotResponse {
 }
 
 export interface WorkerControlResponse {
+  worker_id: string;
+  region: string;
+  region_description: string;
   is_enabled: boolean;
   worker_state: "running" | "stopped";
   updated_at: string;
   last_heartbeat: string | null;
+}
+
+export interface WorkerAggregateResponse {
+  is_enabled: boolean;
+  worker_state: "running" | "stopped";
+  updated_at: string;
+  last_heartbeat: string | null;
+  control_configured: boolean;
+  workers: WorkerControlResponse[];
 }
 
 export function toVesselSnapshotResponse(
@@ -60,11 +73,52 @@ export function toVesselSnapshotResponses(
 export function toWorkerControlResponse(
   workerControl: WorkerControl,
 ): WorkerControlResponse {
+  const workerRegion = getWorkerRegion(workerControl.workerId);
+
   return {
+    worker_id: workerControl.workerId,
+    region: workerRegion.name,
+    region_description: workerRegion.description,
     is_enabled: workerControl.isEnabled,
     worker_state: workerControl.workerState,
     updated_at: workerControl.updatedAt,
     last_heartbeat: workerControl.lastHeartbeat,
+  };
+}
+
+export function toWorkerControlResponses(
+  workerControls: WorkerControl[],
+): WorkerControlResponse[] {
+  return workerControls.map(toWorkerControlResponse);
+}
+
+export function toWorkerAggregateResponse(
+  workerControls: WorkerControl[],
+  controlConfigured: boolean,
+): WorkerAggregateResponse {
+  const updatedAt = workerControls
+    .map(({ updatedAt: timestamp }) => timestamp)
+    .sort()
+    .at(-1);
+  const heartbeatValues = workerControls.map(
+    ({ lastHeartbeat }) => lastHeartbeat,
+  );
+
+  return {
+    is_enabled:
+      workerControls.length > 0 &&
+      workerControls.every(({ isEnabled }) => isEnabled),
+    worker_state:
+      workerControls.length > 0 &&
+      workerControls.every(({ workerState }) => workerState === "running")
+        ? "running"
+        : "stopped",
+    updated_at: updatedAt ?? new Date(0).toISOString(),
+    last_heartbeat: heartbeatValues.some((heartbeat) => heartbeat === null)
+      ? null
+      : (heartbeatValues.sort()[0] ?? null),
+    control_configured: controlConfigured,
+    workers: toWorkerControlResponses(workerControls),
   };
 }
 

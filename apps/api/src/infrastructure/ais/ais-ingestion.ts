@@ -2,6 +2,7 @@ import WebSocket from "ws";
 import type { RawData } from "ws";
 import type { AsyncHandler, Ingestion } from "../../application/ports.ts";
 import type {
+  BoundingBox,
   PositionReport,
   ShipStaticData,
   VesselClass,
@@ -9,7 +10,6 @@ import type {
 
 const AIS_STREAM_URL = "wss://stream.aisstream.io/v0/stream";
 // Covers Indonesia's maritime extent from the Indian Ocean to Papua.
-type BoundingBox = [[number, number], [number, number]];
 const DEFAULT_BOUNDING_BOXES: BoundingBox[] = [
   [
     [-11, 95],
@@ -75,7 +75,7 @@ export interface AisIngestionOptions {
   onPosition?: AsyncHandler<PositionReport>;
   onMetadata?: AsyncHandler<ShipStaticData>;
   streamUrl?: string;
-  boundingBoxes?: BoundingBox[];
+  boundingBoxes?: readonly BoundingBox[];
   socketFactory?: (url: string) => AisSocket;
   logger?: AisLogger;
 }

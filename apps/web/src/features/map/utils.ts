@@ -42,6 +42,12 @@ function isCoordinate(value: unknown): value is Coordinate {
   );
 }
 
+function isNullableNumber(value: unknown): value is number | null {
+  return (
+    value === null || (typeof value === "number" && Number.isFinite(value))
+  );
+}
+
 export function createActivityEvent(
   type: ActivityType,
   title: string,
@@ -152,7 +158,10 @@ export function isTrackFeature(track: unknown): track is TrackFeature {
     !Array.isArray(geometry.coordinates) ||
     !isObject(properties) ||
     !Array.isArray(properties.timestamps) ||
-    !Array.isArray(properties.headings)
+    !Array.isArray(properties.headings) ||
+    !Array.isArray(properties.sogs) ||
+    !Array.isArray(properties.cogs) ||
+    !Array.isArray(properties.nav_statuses)
   ) {
     return false;
   }
@@ -163,12 +172,18 @@ export function isTrackFeature(track: unknown): track is TrackFeature {
       (timestamp): timestamp is string | null =>
         timestamp === null || typeof timestamp === "string",
     ) &&
-    properties.headings.every(
-      (heading): heading is number | null =>
-        heading === null || typeof heading === "number",
+    properties.headings.every(isNullableNumber) &&
+    properties.sogs.every(isNullableNumber) &&
+    properties.cogs.every(isNullableNumber) &&
+    properties.nav_statuses.every(
+      (status): status is string | null =>
+        status === null || typeof status === "string",
     ) &&
     properties.timestamps.length === geometry.coordinates.length &&
-    properties.headings.length === geometry.coordinates.length
+    properties.headings.length === geometry.coordinates.length &&
+    properties.sogs.length === geometry.coordinates.length &&
+    properties.cogs.length === geometry.coordinates.length &&
+    properties.nav_statuses.length === geometry.coordinates.length
   );
 }
 
@@ -186,12 +201,17 @@ export function getTrackPlaybackPosition(
   }
 
   const heading = track.properties.headings[index];
+  const sog = track.properties.sogs[index];
+  const cog = track.properties.cogs[index];
+  const navStatus = track.properties.nav_statuses[index];
 
   return {
     longitude: Number(coordinates[0]),
     latitude: Number(coordinates[1]),
-    heading:
-      typeof heading === "number" && Number.isFinite(heading) ? heading : 0,
+    heading: heading ?? 0,
+    sog: sog ?? null,
+    cog: cog ?? null,
+    navStatus: navStatus ?? null,
     timestamp: track.properties.timestamps[index] || null,
   };
 }
